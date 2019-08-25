@@ -37,14 +37,12 @@ fn main() {
         id_prefixes: None,
         description: None,
     });
-    /*
-    // Returns a bad request every time we do that
+    // Requires always passing Origin when enabled
     app.middleware(
         CorsMiddleware::new()
             .allow_origin(CorsOrigin::from("*"))
-            .allow_methods(HeaderValue::from_static("GET, POST, OPTIONS")),
+            .allow_methods(HeaderValue::from_static("GET")),
     );
-    */
     app.at("/*").get(handle_path);
     app.run("127.0.0.1:8000").unwrap();
 }
