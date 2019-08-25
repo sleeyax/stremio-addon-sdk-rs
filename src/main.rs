@@ -9,16 +9,18 @@ use std::str::FromStr;
 // @TODO another return type
 async fn handle_path(ctx: Context<Manifest>) -> EndpointResult {
     let path = ctx.uri().path();
-    let parsed = ResourceRef::from_str(&path);
-    match (path, parsed) {
-        ("/manifest.json", _) => Ok(response::json(ctx.state())),
-        (_, Ok(p)) => {
-            dbg!(p);
-            let msg = ResourceResponse::Streams { streams: vec![] };
-            Ok(response::json(msg))
-        },
-        _ => Err(StatusCode::NOT_FOUND.into()),
+    
+    if path == "/manifest.json" {
+        return Ok(response::json(ctx.state()));
     }
+
+    let resource = match ResourceRef::from_str(&path) {
+        Ok(r) => r,
+        Err(_) => return Err(StatusCode::NOT_FOUND.into())
+    };
+
+    let msg = ResourceResponse::Streams { streams: vec![] };
+    Ok(response::json(msg))
 }
 
 fn main() {
