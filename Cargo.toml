@@ -1,0 +1,14 @@
+[package]
+name = "stremio-addon"
+version = "0.1.0"
+authors = ["Ivo Georgiev <ivo@strem.io>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+stremio-core = { git = "https://github.com/stremio/stremio-core" }
+semver = "*"
+tide = { git = "https://github.com/rustasync/tide" }
+http = "0.1"
+
