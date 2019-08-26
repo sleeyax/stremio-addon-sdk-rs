@@ -14,7 +14,7 @@ pub enum RouterErr {
     Parse(ParseResourceErr)
 }
 pub trait AddonRouter {
-    fn manifest(&self) -> &Manifest;
+    fn get_manifest(&self) -> &Manifest;
     fn route(&self, path: &str) -> RouterFut;
 }
 
@@ -23,7 +23,7 @@ pub struct AddonBase {
     manifest: Manifest
 }
 impl AddonRouter for AddonBase {
-    fn manifest(&self) -> &Manifest {
+    fn get_manifest(&self) -> &Manifest {
         &self.manifest
     }
 
@@ -39,8 +39,8 @@ pub struct WithHandler<T: AddonRouter> {
     handler: Handler,
 }
 impl<T: AddonRouter> AddonRouter for WithHandler<T> {
-    fn manifest(&self) -> &Manifest {
-        self.base.manifest()
+    fn get_manifest(&self) -> &Manifest {
+        self.base.get_manifest()
     }
 
     fn route(&self, path: &str) -> RouterFut {
@@ -56,18 +56,18 @@ impl<T: AddonRouter> AddonRouter for WithHandler<T> {
 }
 
 // Builder: build something that implements WithHandler
+// two different types for the builder, when we attach handlers?
 
-/*
-impl AddonInterface for WithHandler {
-    fn manifest(_: Self) -> EnvFuture<Manifest> {
-        Box::new(future::ok(T::manifest()))
+
+impl<T: AddonRouter> AddonInterface for WithHandler<T> {
+    fn manifest(&self) -> EnvFuture<Manifest> {
+        Box::new(future::ok(self.get_manifest().to_owned()))
     }
-    fn get(_: Self, path: &ResourceRef) -> EnvFuture<ResourceResponse> {
+    fn get(&self, path: &ResourceRef) -> EnvFuture<ResourceResponse> {
         // @TODO
         unimplemented!()
     }
 }
-*/
 
 // implement the base that just serves the manifest or NotFound
 // then implement Handler
