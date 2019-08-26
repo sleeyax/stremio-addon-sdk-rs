@@ -56,9 +56,39 @@ impl<T: AddonRouter> AddonRouter for WithHandler<T> {
 }
 
 // Builder: build something that implements WithHandler
-// two different types for the builder, when we attach handlers?
+// @TODO: typestate, two different types for the builder, when we attach handlers
+// so that we cannot build before that
+pub enum BaseBuilder {
+    WithManifest(AddonBase),
+    WithHandlers(WithHandler<AddonBase>),
+}
+impl BaseBuilder {
+    fn new(manifest: Manifest) -> Self {
+        Self::WithManifest(AddonBase { manifest })
+    }
+    fn handle_resource(self, resource_name: &str, handler: Handler) -> Self {
+        Self::WithHandlers(WithHandler {
+            base: match self {
+                Self::WithManifest(x) => x,
+                Self::WithHandlers(x) => unreachable!("TODO: allow adding more handlers")
+            },
+            match_prefix: format!("/{}/", resource_name),
+            handler
+        })
+    }
+    fn build(self) -> WithHandler<AddonBase> {
+        // @TODO we can check whether all resources in the manifest are defined
+        match self {
+            Self::WithManifest(_) => panic!("you must define handlers"),
+            Self::WithHandlers(x) => x
+        }
+    }
+}
+//pub struct BuilderWithHandlers {}
 
-
+// @TODO
+// it just needs an Error trait on RouterErr
+/*
 impl<T: AddonRouter> AddonInterface for WithHandler<T> {
     fn manifest(&self) -> EnvFuture<Manifest> {
         Box::new(future::ok(self.get_manifest().to_owned()))
@@ -67,6 +97,4 @@ impl<T: AddonRouter> AddonInterface for WithHandler<T> {
         Box::new(self.route(&req.to_string()).map_err(Into::into))
     }
 }
-
-// implement the base that just serves the manifest or NotFound
-// then implement Handler
+*/
