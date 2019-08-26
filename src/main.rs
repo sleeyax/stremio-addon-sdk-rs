@@ -6,16 +6,13 @@ use stremio_core::types::addons::{ResourceRef, ResourceResponse, Manifest, Manif
 use semver::Version;
 use std::str::FromStr;
 
-mod router;
+async fn handle_manifest(ctx: Context<Manifest>) -> EndpointResult {
+    Ok(response::json(ctx.state()))
+}
 
-// @TODO another return type
 async fn handle_path(ctx: Context<Manifest>) -> EndpointResult {
     let path = ctx.uri().path();
     
-    if path == "/manifest.json" {
-        return Ok(response::json(ctx.state()));
-    }
-
     let resource = match ResourceRef::from_str(&path) {
         Ok(r) => r,
         Err(_) => return Err(StatusCode::NOT_FOUND.into())
@@ -45,6 +42,7 @@ fn main() {
             .allow_origin(CorsOrigin::from("*"))
             .allow_methods(HeaderValue::from_static("GET")),
     );
+    app.at("/manifest.json").get(handle_manifest);
     app.at("/*").get(handle_path);
     app.run("127.0.0.1:8000").unwrap();
 }
