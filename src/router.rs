@@ -58,11 +58,11 @@ impl<T: AddonRouter> AddonRouter for WithHandler<T> {
 // Builder: build something that implements WithHandler
 // @TODO: typestate, two different types for the builder, when we attach handlers
 // so that we cannot build before that
-pub enum BaseBuilder {
+pub enum Builder {
     WithManifest(AddonBase),
     WithHandlers(WithHandler<AddonBase>),
 }
-impl BaseBuilder {
+impl Builder {
     fn new(manifest: Manifest) -> Self {
         Self::WithManifest(AddonBase { manifest })
     }
