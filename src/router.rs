@@ -63,9 +63,8 @@ impl<T: AddonRouter> AddonInterface for WithHandler<T> {
     fn manifest(&self) -> EnvFuture<Manifest> {
         Box::new(future::ok(self.get_manifest().to_owned()))
     }
-    fn get(&self, path: &ResourceRef) -> EnvFuture<ResourceResponse> {
-        // @TODO
-        unimplemented!()
+    fn get(&self, req: &ResourceRef) -> EnvFuture<ResourceResponse> {
+        Box::new(self.route(&req.to_string()).map_err(Into::into))
     }
 }
 
