@@ -6,6 +6,8 @@ use stremio_core::types::addons::{ResourceRef, ResourceResponse, Manifest, Manif
 use semver::Version;
 use std::str::FromStr;
 
+mod router;
+
 // @TODO another return type
 async fn handle_path(ctx: Context<Manifest>) -> EndpointResult {
     let path = ctx.uri().path();

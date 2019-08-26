@@ -11,4 +11,4 @@ stremio-core = { git = "https://github.com/stremio/stremio-core" }
 semver = "*"
 tide = { git = "https://github.com/rustasync/tide" }
 http = "0.1"
-
+futures = "0.1"
