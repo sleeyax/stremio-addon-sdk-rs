@@ -8,6 +8,7 @@ use std::str::FromStr;
 type Handler = fn (req: &ResourceRef) -> EnvFuture<ResourceResponse>;
 type RouterFut = Box<dyn Future<Item=ResourceResponse, Error=RouterErr>>;
 
+#[derive(Debug)]
 pub enum RouterErr {
     NotFound,
     Handler(Box<dyn Error>),
@@ -16,6 +17,12 @@ pub enum RouterErr {
 pub trait AddonRouter {
     fn get_manifest(&self) -> &Manifest;
     fn route(&self, path: &str) -> RouterFut;
+}
+impl Error for RouterErr {}
+impl std::fmt::Display for RouterErr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RouterError")
+    }
 }
 
 // Base: just serving the manifest
@@ -63,7 +70,7 @@ pub enum Builder {
     WithHandlers(WithHandler<AddonBase>),
 }
 impl Builder {
-    fn new(manifest: Manifest) -> Self {
+    pub fn new(manifest: Manifest) -> Self {
         Self::WithManifest(AddonBase { manifest })
     }
     fn handle_resource(self, resource_name: &str, handler: Handler) -> Self {
@@ -84,11 +91,12 @@ impl Builder {
         }
     }
 }
-//pub struct BuilderWithHandlers {}
+
+pub struct BuilderWithHandlers {}
 
 // @TODO
 // it just needs an Error trait on RouterErr
-/*
+
 impl<T: AddonRouter> AddonInterface for WithHandler<T> {
     fn manifest(&self) -> EnvFuture<Manifest> {
         Box::new(future::ok(self.get_manifest().to_owned()))
@@ -97,4 +105,4 @@ impl<T: AddonRouter> AddonInterface for WithHandler<T> {
         Box::new(self.route(&req.to_string()).map_err(Into::into))
     }
 }
-*/
+
