@@ -1,29 +1,19 @@
-use http::header::HeaderValue;
-use http::status::StatusCode;
-use tide::{Context, App, response, EndpointResult};
-use tide::middleware::{CorsMiddleware, CorsOrigin};
-use stremio_core::types::addons::{ResourceRef, ResourceResponse, Manifest, ManifestResource};
+use stremio_core::state_types::EnvFuture;
 use semver::Version;
-use std::str::FromStr;
+use stremio_core::types::addons::{Manifest, ManifestResource, ResourceRef, ResourceResponse};
+mod lib;
+use lib::router::Builder;
+use futures::{future};
+use lib::server::serve_http;
 
-async fn handle_manifest(ctx: Context<Manifest>) -> EndpointResult {
-    Ok(response::json(ctx.state()))
-}
-
-async fn handle_path(ctx: Context<Manifest>) -> EndpointResult {
-    let path = ctx.uri().path();
-    
-    let resource = match ResourceRef::from_str(&path) {
-        Ok(r) => r,
-        Err(_) => return Err(StatusCode::NOT_FOUND.into())
-    };
-
-    let msg = ResourceResponse::Streams { streams: vec![] };
-    Ok(response::json(msg))
+fn handle_stream(req: &ResourceRef) -> EnvFuture<ResourceResponse> {
+    let res = ResourceResponse::Streams { streams: vec![] };
+    dbg!(&res);
+    return Box::new(future::ok(res));
 }
 
 fn main() {
-    let mut app = App::with_state(Manifest {
+    let manifest = Manifest {
         id: "org.test".into(),
         name: "test".into(),
         version: Version::new(1, 0, 0),
@@ -35,14 +25,11 @@ fn main() {
         logo: None,
         id_prefixes: None,
         description: None,
-    });
-    // Requires always passing Origin when enabled
-    app.middleware(
-        CorsMiddleware::new()
-            .allow_origin(CorsOrigin::from("*"))
-            .allow_methods(HeaderValue::from_static("GET")),
-    );
-    app.at("/manifest.json").get(handle_manifest);
-    app.at("/*").get(handle_path);
-    app.run("127.0.0.1:8000").unwrap();
+    };
+
+    let build = Builder::new(manifest)
+        .handle_resource("stream", handle_stream)
+        .build();
+
+    serve_http(build);
 }

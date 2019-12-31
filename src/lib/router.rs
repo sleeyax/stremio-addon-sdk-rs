@@ -73,7 +73,7 @@ impl Builder {
     pub fn new(manifest: Manifest) -> Self {
         Self::WithManifest(AddonBase { manifest })
     }
-    fn handle_resource(self, resource_name: &str, handler: Handler) -> Self {
+    pub fn handle_resource(self, resource_name: &str, handler: Handler) -> Self {
         Self::WithHandlers(WithHandler {
             base: match self {
                 Self::WithManifest(x) => x,
@@ -83,7 +83,7 @@ impl Builder {
             handler
         })
     }
-    fn build(self) -> WithHandler<AddonBase> {
+    pub fn build(self) -> WithHandler<AddonBase> {
         // @TODO we can check whether all resources in the manifest are defined
         match self {
             Self::WithManifest(_) => panic!("you must define handlers"),
