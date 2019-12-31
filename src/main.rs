@@ -8,11 +8,11 @@ use lib::server::serve_http;
 
 fn handle_stream(req: &ResourceRef) -> EnvFuture<ResourceResponse> {
     let res = ResourceResponse::Streams { streams: vec![] };
-    dbg!(&res);
     return Box::new(future::ok(res));
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let manifest = Manifest {
         id: "org.test".into(),
         name: "test".into(),
@@ -25,11 +25,13 @@ fn main() {
         logo: None,
         id_prefixes: None,
         description: None,
+        addon_catalogs: vec![],
+        behavior_hints:  Default::default() // serde_json::map::Map::new()
     };
 
     let build = Builder::new(manifest)
         .handle_resource("stream", handle_stream)
         .build();
 
-    serve_http(build);
+    serve_http(build).await;
 }

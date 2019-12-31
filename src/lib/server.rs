@@ -1,45 +1,37 @@
 use stremio_core::state_types::EnvFuture;
-use http::request::Request;
-use http::header::HeaderValue;
-use http::status::StatusCode;
-use tide::{Context, App, response, EndpointResult};
-use tide::middleware::{CorsMiddleware, CorsOrigin};
-use stremio_core::types::addons::{ResourceRef, ResourceResponse, Manifest, ManifestResource};
-use semver::Version;
-use stremio_core::addon_transport::AddonInterface;
+use stremio_core::types::addons::{ResourceRef, ResourceResponse};
+use futures::{Future};
 use std::str::FromStr;
-use futures::{future, Future};
+use stremio_core::addon_transport::AddonInterface;
 use super::router::{WithHandler, AddonBase};
 use super::router::AddonRouter;
 
-async fn handle_manifest(ctx: Context<WithHandler<AddonBase>>) -> EndpointResult {
-    Ok(response::json(ctx.state().get_manifest()))
+async fn handle_manifest(req: tide::Request<WithHandler<AddonBase>>) -> tide::Response {
+    tide::Response::new(200).body_json(req.state().get_manifest()).unwrap()
 }
 
-async fn handle_path(ctx: Context<WithHandler<AddonBase>>) -> EndpointResult {
-    let path = ctx.uri().path();
-    
+async fn handle_path(req: tide::Request<WithHandler<AddonBase>>) -> tide::Response {
+    let path = req.uri().path();
     let resource = match ResourceRef::from_str(&path) {
         Ok(r) => r,
-        Err(_) => return Err(StatusCode::NOT_FOUND.into())
+        Err(_) => return tide::Response::new(404)
     };
     dbg!(&resource);
     
-    // let future = ctx.state().get(&resource);
+    let env_future: EnvFuture<ResourceResponse> = req.state().get(&resource);
+    let resource_response = match env_future.wait() {
+        Ok(r) => r,
+        Err(_) => return tide::Response::new(500)
+    };
+    dbg!(&resource_response);
 
-    let msg = ResourceResponse::Streams { streams: vec![] };
-    Ok(response::json(msg))
+    // let msg = ResourceResponse::Streams { streams: vec![] };
+    tide::Response::new(200).body_json(&resource_response).unwrap()
 }
 
-pub fn serve_http(handler: WithHandler<AddonBase>) {
-    let mut app = App::with_state(handler);
-    // Requires always passing Origin when enabled
-    app.middleware(
-        CorsMiddleware::new()
-            .allow_origin(CorsOrigin::from("*"))
-            .allow_methods(HeaderValue::from_static("GET")),
-    );
+pub async fn serve_http(handler: WithHandler<AddonBase>) {
+    let mut app = tide::with_state(handler);
     app.at("/manifest.json").get(handle_manifest);
     app.at("/*").get(handle_path);
-    app.run("127.0.0.1:8000").unwrap();
+    app.listen("127.0.0.1:8000").await.expect("Failed to start server");
 }
