@@ -44,7 +44,7 @@ impl AddonRouter for AddonBase {
 #[derive(Clone)]
 pub struct WithHandler<T: AddonRouter> {
     base: T,
-    match_prefix: String,
+    pub match_prefix: String,
     handler: Handler,
 }
 impl<T: AddonRouter> AddonRouter for WithHandler<T> {

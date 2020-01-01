@@ -1,3 +1,4 @@
+use crate::lib::router::BuilderWithHandlers;
 use stremio_core::state_types::EnvFuture;
 use semver::Version;
 use stremio_core::types::addons::{Manifest, ManifestResource, ResourceRef, ResourceResponse};
@@ -8,6 +9,11 @@ use lib::server::serve_http;
 
 fn handle_stream(req: &ResourceRef) -> EnvFuture<ResourceResponse> {
     let res = ResourceResponse::Streams { streams: vec![] };
+    return Box::new(future::ok(res));
+}
+
+fn handle_meta(req: &ResourceRef) -> EnvFuture<ResourceResponse> {
+    let res = ResourceResponse::Metas { metas: vec![] };
     return Box::new(future::ok(res));
 }
 
@@ -31,6 +37,7 @@ async fn main() {
 
     let build = Builder::new(manifest)
         .handle_resource("stream", handle_stream)
+        .handle_resource("meta", handle_meta)
         .build();
 
     serve_http(build).await;
