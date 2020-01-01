@@ -26,6 +26,7 @@ impl std::fmt::Display for RouterErr {
 }
 
 // Base: just serving the manifest
+#[derive(Clone)]
 pub struct AddonBase {
     manifest: Manifest
 }
@@ -40,6 +41,7 @@ impl AddonRouter for AddonBase {
 }
 
 // WithHandler: attach a handler
+#[derive(Clone)]
 pub struct WithHandler<T: AddonRouter> {
     base: T,
     match_prefix: String,
@@ -63,39 +65,49 @@ impl<T: AddonRouter> AddonRouter for WithHandler<T> {
 }
 
 // Builder: build something that implements WithHandler
-// @TODO: typestate, two different types for the builder, when we attach handlers
-// so that we cannot build before that
 pub enum Builder {
     WithManifest(AddonBase),
-    WithHandlers(WithHandler<AddonBase>),
 }
 impl Builder {
     pub fn new(manifest: Manifest) -> Self {
         Self::WithManifest(AddonBase { manifest })
     }
-    pub fn handle_resource(self, resource_name: &str, handler: Handler) -> Self {
-        Self::WithHandlers(WithHandler {
+    pub fn handle_resource(self, resource_name: &str, handler: Handler) -> BuilderWithHandlers {
+        let with_handler = WithHandler {
             base: match self {
-                Self::WithManifest(x) => x,
-                Self::WithHandlers(x) => unreachable!("TODO: allow adding more handlers")
+                Self::WithManifest(x) => x
             },
             match_prefix: format!("/{}/", resource_name),
             handler
-        })
-    }
-    pub fn build(self) -> WithHandler<AddonBase> {
-        // @TODO we can check whether all resources in the manifest are defined
-        match self {
-            Self::WithManifest(_) => panic!("you must define handlers"),
-            Self::WithHandlers(x) => x
+        };
+        // typestate, two different types for the builder, when we attach handlers
+        // so that we cannot build before that
+        BuilderWithHandlers {
+            handlers: vec![with_handler.clone()],
+            base: with_handler.base,
         }
     }
 }
 
-pub struct BuilderWithHandlers {}
-
-// @TODO
-// it just needs an Error trait on RouterErr
+// BuilderWithHandlers: builder with handlers attached
+pub struct BuilderWithHandlers {
+    base: AddonBase,
+    handlers: Vec<WithHandler<AddonBase>>
+}
+impl BuilderWithHandlers {
+    pub fn handle_resource(&mut self, resource_name: &str, handler: Handler) -> &mut Self {
+        self.handlers.push(WithHandler {
+            base: self.base.clone(),
+            match_prefix: format!("/{}/", resource_name),
+            handler
+        });
+        self
+    }
+    pub fn build(&self) -> Vec<WithHandler<AddonBase>> {
+        // @TODO we can check whether all resources in the manifest are defined
+       self.handlers.clone()
+    }
+}
 
 impl<T: AddonRouter> AddonInterface for WithHandler<T> {
     fn manifest(&self) -> EnvFuture<Manifest> {
