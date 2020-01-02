@@ -79,8 +79,8 @@ async fn main() {
 
     // build addon interface
     let interface = Builder::new(manifest)
-        .handle_resource("catalog", handle_catalog)
-        .handle_resource("stream", handle_stream)
+        .define_catalog_handler(handle_catalog)
+        .define_stream_handler(handle_stream)
         .build();
 
     serve_http(interface).await;

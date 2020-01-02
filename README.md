@@ -20,10 +20,10 @@ async fn main() {
     // build addon interface
     let interface = Builder::new(manifest)
         // function as parameter
-        .handle_resource("catalog", handle_catalog)
-        .handle_resource("stream", handle_stream)
+        .define_catalog_handler(handle_catalog)
+        .define_stream_handler(handle_stream)
         // closure as parameter
-        .handle_resource("meta", |resource: &ResourceRef| -> EnvFuture<ResourceResponse> {
+        .define_meta_handler(|resource: &ResourceRef| -> EnvFuture<ResourceResponse> {
             let response = ResourceResponse::Metas { metas: vec![] };
             return Box::new(future::ok(response));
         })

@@ -64,27 +64,15 @@ impl<T: AddonRouter> AddonRouter for WithHandler<T> {
     }
 }
 
-// Builder: build something that implements WithHandler
-pub enum Builder {
-    WithManifest(AddonBase),
-}
+// Builder: constructs a new builder that implements WithHandler
+pub struct Builder {}
 impl Builder {
-    pub fn new(manifest: Manifest) -> Self {
-        Self::WithManifest(AddonBase { manifest })
-    }
-    pub fn handle_resource(self, resource_name: &str, handler: Handler) -> BuilderWithHandlers {
-        let with_handler = WithHandler {
-            base: match self {
-                Self::WithManifest(x) => x
-            },
-            match_prefix: format!("/{}/", resource_name),
-            handler
-        };
+    pub fn new(manifest: Manifest) -> BuilderWithHandlers {
         // typestate, two different types for the builder, when we attach handlers
         // so that we cannot build before that
         BuilderWithHandlers {
-            handlers: vec![with_handler.clone()],
-            base: with_handler.base,
+            handlers: vec![],
+            base: AddonBase { manifest }
         }
     }
 }
@@ -95,13 +83,25 @@ pub struct BuilderWithHandlers {
     handlers: Vec<WithHandler<AddonBase>>
 }
 impl BuilderWithHandlers {
-    pub fn handle_resource(&mut self, resource_name: &str, handler: Handler) -> &mut Self {
+    fn handle_resource(&mut self, resource_name: &str, handler: Handler) -> &mut Self {
         self.handlers.push(WithHandler {
             base: self.base.clone(),
             match_prefix: format!("/{}/", resource_name),
             handler
         });
         self
+    }
+    pub fn define_stream_handler(&mut self, handler: Handler) -> &mut Self {
+        self.handle_resource("stream", handler)
+    }
+    pub fn define_meta_handler(&mut self, handler: Handler) -> &mut Self {
+        self.handle_resource("meta", handler)
+    }
+    pub fn define_catalog_handler(&mut self, handler: Handler) -> &mut Self {
+        self.handle_resource("catalog", handler)
+    }
+    pub fn define_subtitles_handler(&mut self, handler: Handler) -> &mut Self {
+        self.handle_resource("subtitles", handler)
     }
     pub fn build(&self) -> Vec<WithHandler<AddonBase>> {
         // @TODO we can check whether all resources in the manifest are defined
