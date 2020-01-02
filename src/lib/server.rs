@@ -3,6 +3,8 @@ use stremio_core::types::addons::{ResourceRef, ResourceResponse};
 use futures::{Future};
 use std::str::FromStr;
 use stremio_core::addon_transport::AddonInterface;
+use tide::middleware::{Cors, Origin};
+use http::header::HeaderValue;
 use super::router::{WithHandler, AddonBase};
 use super::router::AddonRouter;
 
@@ -41,6 +43,12 @@ async fn handle_path(req: tide::Request<Vec<WithHandler<AddonBase>>>) -> tide::R
 
 pub async fn serve_http(handlers: Vec<WithHandler<AddonBase>>) {
     let mut app = tide::with_state(handlers);
+    app.middleware(
+        Cors::new()
+            .allow_methods(HeaderValue::from_static("GET, POST, OPTIONS"))
+            .allow_origin(Origin::from("*"))
+            .allow_credentials(false)
+    );
     app.at("/manifest.json").get(handle_manifest);
     app.at("/*").get(handle_path);
     app.listen("127.0.0.1:8000").await.expect("Failed to start server");
