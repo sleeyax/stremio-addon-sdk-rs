@@ -1,4 +1,4 @@
-use stremio_core::types::addons::{ResourceRef, ParseResourceErr, ResourceResponse, Manifest};
+use stremio_core::types::addons::{ResourceRef, ManifestResource, ParseResourceErr, ResourceResponse, Manifest};
 use stremio_core::addon_transport::AddonInterface;
 use stremio_core::state_types::EnvFuture;
 use futures::{future, Future};
@@ -103,9 +103,58 @@ impl BuilderWithHandlers {
     pub fn define_subtitles_handler(&mut self, handler: Handler) -> &mut Self {
         self.handle_resource("subtitles", handler)
     }
+    fn prefix_to_name(&self, prefix: &String) -> String {
+        prefix.replace("/", "")
+    }
+    fn validate(&self) -> Vec<String> {
+        let mut errors: Vec<String> = Vec::new();
+        let manifest = self.base.get_manifest();
+
+        if self.handlers.len() == 0 {
+            errors.push("at least one handler must be defined".into());
+        }
+        
+        // get all handlers that are declared in the maifest
+        let mut handlers_in_manifest: Vec<String> = Vec::new();
+        if manifest.catalogs.len() > 0 {
+            handlers_in_manifest.push("catalog".into());
+        }
+        for resource in &manifest.resources {
+            // NOTE: resource.name() should probably be public in stremio-core, making this code unnecessary
+            match resource {
+                ManifestResource::Short(n) => handlers_in_manifest.push(n.to_string()),
+                ManifestResource::Full { name, .. } => handlers_in_manifest.push(name.to_string()),
+            }
+        }
+        
+        // check if defined handlers are also specified in the manifest
+        for defined_handler in &self.handlers {
+            if !handlers_in_manifest.iter().any(|r| r.to_string() == self.prefix_to_name(&defined_handler.match_prefix)) {
+                if defined_handler.match_prefix == "/catalog/" {
+                    errors.push("manifest.catalogs is empty, catalog handler will never be called".into());
+                }
+                else {
+                    errors.push(format!("manifest.resources does not contain: {}", self.prefix_to_name(&defined_handler.match_prefix)));
+                }
+            }
+        }
+
+        // check if handlers that are specified in the manifest are also defined
+        for handler in handlers_in_manifest {
+            if !self.handlers.iter().any(|r| handler == self.prefix_to_name(&r.match_prefix)) {
+                errors.push(format!("manifest definition requires handler for {}, but it is not provided", handler));
+            }
+        }
+
+        return errors;
+        
+    }
     pub fn build(&self) -> Vec<WithHandler<AddonBase>> {
-        // @TODO we can check whether all resources in the manifest are defined
-       self.handlers.clone()
+        let errors = self.validate();
+        if errors.len() > 0 {
+            panic!(format!("\n--failed to build addon interface-- \n{}", errors.join("\n")));
+        }
+        self.handlers.clone()
     }
 }
 
