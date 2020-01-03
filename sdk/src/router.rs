@@ -84,6 +84,9 @@ pub struct BuilderWithHandlers {
 }
 impl BuilderWithHandlers {
     fn handle_resource(&mut self, resource_name: &str, handler: Handler) -> &mut Self {
+        if self.handlers.iter().any(|h| self.prefix_to_name(&h.match_prefix) == resource_name) {
+            panic!("handler for resource {} is already defined!", resource_name);
+        }
         self.handlers.push(WithHandler {
             base: self.base.clone(),
             match_prefix: format!("/{}/", resource_name),
