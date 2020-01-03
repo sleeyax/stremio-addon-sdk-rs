@@ -8,7 +8,7 @@
 ## Usage
 ```rust
 use stremio_addon_sdk::router::Builder;
-use stremio_addon_sdk::server::serve_http;
+use stremio_addon_sdk::server::{serve_http, ServerOptions};
 
 #[tokio::main]
 async fn main() {
@@ -29,8 +29,8 @@ async fn main() {
         })
         .build();
 
-    // run HTTP server
-    serve_http(interface).await;
+    // run HTTP server with default settings
+    serve_http(interface, ServerOptions::default()).await;
 }
 ```
 

@@ -3,7 +3,7 @@ use semver::Version;
 use stremio_core::types::addons::*;
 use stremio_core::types::*;
 use stremio_addon_sdk::router::Builder;
-use stremio_addon_sdk::server::serve_http;
+use stremio_addon_sdk::server::{serve_http, ServerOptions};
 use futures::future;
 
 fn handle_stream(resource: &ResourceRef) -> EnvFuture<ResourceResponse> {
@@ -83,5 +83,11 @@ async fn main() {
         .define_stream_handler(handle_stream)
         .build();
 
-    serve_http(interface).await;
+    // HTTP server settings
+    let options = ServerOptions {
+        cache_max_age: Some(9999),
+        port: 1337
+    };
+
+    serve_http(interface, options).await;
 }

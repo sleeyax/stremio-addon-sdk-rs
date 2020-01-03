@@ -12,4 +12,4 @@ semver = "*"
 # temporary fork of tide untill CORS is officialy suported in the latest version
 tide = { git = "https://github.com/sleeyax/tide" }
 http = "0.1"
-futures = "0.1"
+futures = "0.1.x"

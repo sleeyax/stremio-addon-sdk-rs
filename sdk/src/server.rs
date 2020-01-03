@@ -7,6 +7,7 @@ use tide::middleware::{Cors, Origin};
 use http::header::HeaderValue;
 use super::router::{WithHandler, AddonBase};
 use super::router::AddonRouter;
+use super::cache_middleware::Cache;
 
 async fn handle_manifest(req: tide::Request<Vec<WithHandler<AddonBase>>>) -> tide::Response {
     tide::Response::new(200).body_json(req.state()[0].get_manifest()).unwrap()
@@ -41,7 +42,21 @@ async fn handle_path(req: tide::Request<Vec<WithHandler<AddonBase>>>) -> tide::R
     tide::Response::new(200).body_json(&resource_response).unwrap()
 }
 
-pub async fn serve_http(handlers: Vec<WithHandler<AddonBase>>) {
+pub struct ServerOptions {
+    pub port: i16,
+    pub cache_max_age: Option<i32>
+}
+impl Default for ServerOptions {
+    fn default() -> Self {
+        Self {
+            // cache 3 days
+            cache_max_age: Some(24 * 3600 * 3),
+            port: 7070
+        }
+    }
+}
+
+pub async fn serve_http(handlers: Vec<WithHandler<AddonBase>>, options: ServerOptions) {
     let mut app = tide::with_state(handlers);
     app.middleware(
         Cors::new()
@@ -49,7 +64,12 @@ pub async fn serve_http(handlers: Vec<WithHandler<AddonBase>>) {
             .allow_origin(Origin::from("*"))
             .allow_credentials(false)
     );
+    if let Some(cache) = options.cache_max_age {
+        app.middleware(
+            Cache::new(cache)
+        );
+    }
     app.at("/manifest.json").get(handle_manifest);
     app.at("/*").get(handle_path);
-    app.listen("127.0.0.1:8000").await.expect("Failed to start server");
+    app.listen(format!("127.0.0.1:{}", options.port)).await.expect("Failed to start server");
 }

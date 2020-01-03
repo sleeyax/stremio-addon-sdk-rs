@@ -1140,7 +1140,7 @@ dependencies = [
 [[package]]
 name = "tide"
 version = "0.5.1"
-source = "git+https://github.com/sleeyax/tide#332c921071e0b50530b73af4156adcab49760343"
+source = "git+https://github.com/sleeyax/tide#e9cedf94952ba34a48e76f1c97c3b9b22b6e304a"
 dependencies = [
  "async-std 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
