@@ -7,13 +7,24 @@ use tide::middleware::{Cors, Origin};
 use http::header::HeaderValue;
 use super::router::{WithHandler, AddonBase};
 use super::router::AddonRouter;
+use super::landing_template::landing_template;
 use super::cache_middleware::Cache;
 
-async fn handle_manifest(req: tide::Request<Vec<WithHandler<AddonBase>>>) -> tide::Response {
+type Handlers = Vec<WithHandler<AddonBase>>;
+
+async fn handle_manifest(req: tide::Request<Handlers>) -> tide::Response {
     tide::Response::new(200).body_json(req.state()[0].get_manifest()).unwrap()
 }
 
-async fn handle_path(req: tide::Request<Vec<WithHandler<AddonBase>>>) -> tide::Response {
+async fn handle_landing(req: tide::Request<Handlers>) -> tide::Response {
+    tide::Response::new(200)
+        .body_string(
+            landing_template(req.state()[0].get_manifest())
+        )
+        .set_header("Content-Type", "text/html")
+}
+
+async fn handle_path(req: tide::Request<Handlers>) -> tide::Response {
     // get requested resource
     let path = req.uri().path();
     let resource = match ResourceRef::from_str(&path) {
@@ -56,7 +67,7 @@ impl Default for ServerOptions {
     }
 }
 
-pub async fn serve_http(handlers: Vec<WithHandler<AddonBase>>, options: ServerOptions) {
+pub async fn serve_http(handlers: Handlers, options: ServerOptions) {
     let mut app = tide::with_state(handlers);
     app.middleware(
         Cors::new()
@@ -70,6 +81,7 @@ pub async fn serve_http(handlers: Vec<WithHandler<AddonBase>>, options: ServerOp
         );
     }
     app.at("/manifest.json").get(handle_manifest);
+    app.at("/").get(handle_landing);
     app.at("/*").get(handle_path);
     app.listen(format!("127.0.0.1:{}", options.port)).await.expect("Failed to start server");
 }
