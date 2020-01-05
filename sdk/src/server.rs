@@ -1,3 +1,5 @@
+use tide::server::Server;
+use tide::server::Service;
 use stremio_core::state_types::EnvFuture;
 use stremio_core::types::addons::{ResourceRef, ResourceResponse};
 use futures::{Future};
@@ -68,6 +70,12 @@ impl Default for ServerOptions {
 }
 
 pub async fn serve_http(handlers: Handlers, options: ServerOptions) {
+    let port = options.port.clone();
+    let app = get_app(handlers, options);
+    app.listen(format!("127.0.0.1:{}", port)).await.expect("Failed to start server");
+}
+
+fn get_app(handlers: Handlers, options: ServerOptions) -> Server<Handlers> {
     let mut app = tide::with_state(handlers);
     app.middleware(
         Cors::new()
@@ -83,5 +91,10 @@ pub async fn serve_http(handlers: Handlers, options: ServerOptions) {
     app.at("/manifest.json").get(handle_manifest);
     app.at("/").get(handle_landing);
     app.at("/*").get(handle_path);
-    app.listen(format!("127.0.0.1:{}", options.port)).await.expect("Failed to start server");
+    app
+}
+
+pub fn get_router(handlers: Handlers, options: ServerOptions) -> Service<Handlers> {
+    let app = get_app(handlers, options);
+    app.into_http_service()
 }
