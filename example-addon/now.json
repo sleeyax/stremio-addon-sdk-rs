@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "src/serverless.rs",
+      "use": "now-rust",
+      "config": {
+        "functions": {
+          "Cargo.toml": {
+            "runtime": "now-rust"
+          }
+        }
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/.*",
+      "dest": "/src/serverless.rs"
+    }
+  ]
+}
