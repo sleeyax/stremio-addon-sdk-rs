@@ -16,6 +16,10 @@ tokio = { version = "0.2", features = ["full"] }
 # ---
 http = "0.1"
 now_lambda = "0.1"
+serde_json = "1.0"
 # comment 'stremio-addon-sdk' above and uncomment the following:
-# stremio-addon-sdk = {git = "https://github.com/sleeyax/stremio-addon-sdk"}
+# stremio-addon-sdk = {git = "https://github.com/sleeyax/stremio-addon-sdk/", branch = "now"}
+[lib]
+name = "serverless"
+path = "src/serverless.rs"
 # ---
