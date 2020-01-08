@@ -1,5 +1,4 @@
-use stremio_addon_sdk::router::AddonBase;
-use stremio_addon_sdk::router::WithHandler;
+use stremio_addon_sdk::router::BuilderWithHandlers;
 use stremio_core::state_types::EnvFuture;
 use stremio_core::types::addons::*;
 use stremio_core::types::*;
@@ -48,7 +47,7 @@ fn handle_catalog(_resource: &ResourceRef) -> EnvFuture<ResourceResponse> {
     ]}))
 }
 
-pub fn get_handlers(manifest: Manifest) -> Vec<WithHandler<AddonBase>> {
+pub fn build(manifest: Manifest) -> BuilderWithHandlers {
      Builder::new(manifest)
         .define_catalog_handler(handle_catalog)
         .define_stream_handler(handle_stream)

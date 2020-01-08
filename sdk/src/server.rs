@@ -1,57 +1,33 @@
-use tide::server::Server;
-use tide::server::Service;
-use stremio_core::state_types::EnvFuture;
-use stremio_core::types::addons::{ResourceRef, ResourceResponse};
+use crate::router::BuilderWithHandlers;
 use futures::{Future};
-use std::str::FromStr;
-use stremio_core::addon_transport::AddonInterface;
 use tide::middleware::{Cors, Origin};
 use http::header::HeaderValue;
-use super::router::{WithHandler, AddonBase};
 use super::router::AddonRouter;
 use super::landing_template::landing_template;
 use super::cache_middleware::Cache;
 
-type Handlers = Vec<WithHandler<AddonBase>>;
-
-async fn handle_manifest(req: tide::Request<Handlers>) -> tide::Response {
-    tide::Response::new(200).body_json(req.state()[0].get_manifest()).unwrap()
+async fn handle_manifest(req: tide::Request<BuilderWithHandlers>) -> tide::Response {
+    tide::Response::new(200).body_json(req.state().handlers[0].get_manifest()).unwrap()
 }
 
-async fn handle_landing(req: tide::Request<Handlers>) -> tide::Response {
+async fn handle_landing(req: tide::Request<BuilderWithHandlers>) -> tide::Response {
     tide::Response::new(200)
         .body_string(
-            landing_template(req.state()[0].get_manifest())
+            landing_template(req.state().handlers[0].get_manifest())
         )
         .set_header("Content-Type", "text/html")
 }
 
-async fn handle_path(req: tide::Request<Handlers>) -> tide::Response {
-    // get requested resource
+async fn handle_path(req: tide::Request<BuilderWithHandlers>) -> tide::Response {
     let path = req.uri().path();
-    let resource = match ResourceRef::from_str(&path) {
-        Ok(r) => r,
-        Err(_) => return tide::Response::new(404)
+    let resource_response_future = match req.state().handle(path) {
+        Some(r) => r,
+        None => return tide::Response::new(404)
     };
-    dbg!(&resource);
-
-    // find correct handler for this resource
-    let handlers: &Vec<WithHandler<AddonBase>> = &req.state();
-    let handler_option = handlers.iter().find(|&item| path.starts_with(&item.match_prefix));
-    let handler = match handler_option {
-        Some(x) => x,
-        _ => return tide::Response::new(404)
-    };
-    
-    // execute the handler
-    let env_future: EnvFuture<ResourceResponse> = handler.get(&resource);
-    let resource_response = match env_future.wait() {
+    let resource_response = match resource_response_future.wait() {
         Ok(r) => r,
         Err(_) => return tide::Response::new(500)
     };
-    dbg!(&resource_response);
-
-    // let msg = ResourceResponse::Streams { streams: vec![] };
     tide::Response::new(200).body_json(&resource_response).unwrap()
 }
 
@@ -69,14 +45,8 @@ impl Default for ServerOptions {
     }
 }
 
-pub async fn serve_http(handlers: Handlers, options: ServerOptions) {
-    let port = options.port.clone();
-    let app = get_app(handlers, options);
-    app.listen(format!("127.0.0.1:{}", port)).await.expect("Failed to start server");
-}
-
-fn get_app(handlers: Handlers, options: ServerOptions) -> Server<Handlers> {
-    let mut app = tide::with_state(handlers);
+pub async fn serve_http(builder: BuilderWithHandlers, options: ServerOptions) {
+    let mut app = tide::with_state(builder);
     app.middleware(
         Cors::new()
             .allow_methods(HeaderValue::from_static("GET, POST, OPTIONS"))
@@ -91,10 +61,5 @@ fn get_app(handlers: Handlers, options: ServerOptions) -> Server<Handlers> {
     app.at("/manifest.json").get(handle_manifest);
     app.at("/").get(handle_landing);
     app.at("/*").get(handle_path);
-    app
-}
-
-pub fn get_router(handlers: Handlers, options: ServerOptions) -> Service<Handlers> {
-    let app = get_app(handlers, options);
-    app.into_http_service()
+    app.listen(format!("127.0.0.1:{}", options.port)).await.expect("Failed to start server");
 }

@@ -65,7 +65,7 @@ impl<T: AddonRouter> AddonRouter for WithHandler<T> {
 }
 
 // Builder: constructs a new builder that implements WithHandler
-pub struct Builder {}
+pub struct Builder;
 impl Builder {
     pub fn new(manifest: Manifest) -> BuilderWithHandlers {
         // typestate, two different types for the builder, when we attach handlers
@@ -78,9 +78,10 @@ impl Builder {
 }
 
 // BuilderWithHandlers: builder with handlers attached
+#[derive(Clone)]
 pub struct BuilderWithHandlers {
     base: AddonBase,
-    handlers: Vec<WithHandler<AddonBase>>
+    pub handlers: Vec<WithHandler<AddonBase>>
 }
 impl BuilderWithHandlers {
     fn handle_resource(&mut self, resource_name: &str, handler: Handler) -> &mut Self {
@@ -105,6 +106,24 @@ impl BuilderWithHandlers {
     }
     pub fn define_subtitles_handler(&mut self, handler: Handler) -> &mut Self {
         self.handle_resource("subtitles", handler)
+    }
+    pub fn handle(&self, path: &str) -> Option<EnvFuture<ResourceResponse>> {
+        // get requested resource
+        let resource = match ResourceRef::from_str(path) {
+            Ok(r) => r,
+            Err(_) => return None
+        };
+        dbg!(&resource);
+
+        // find correct handler for this resource
+        let handler = match self.handlers.iter().find(|&item| path.starts_with(&item.match_prefix)) {
+            Some(x) => x,
+            _ => return None
+        };
+        
+        // execute the handler
+        let env_future: EnvFuture<ResourceResponse> = handler.get(&resource);
+        Some(env_future)
     }
     fn prefix_to_name(&self, prefix: &String) -> String {
         prefix.replace("/", "")
@@ -152,12 +171,12 @@ impl BuilderWithHandlers {
         return errors;
         
     }
-    pub fn build(&self) -> Vec<WithHandler<AddonBase>> {
+    pub fn build(&self) -> Self {
         let errors = self.validate();
         if errors.len() > 0 {
             panic!(format!("\n--failed to build addon interface-- \n{}", errors.join("\n")));
         }
-        self.handlers.clone()
+        self.clone()
     }
 }
 
