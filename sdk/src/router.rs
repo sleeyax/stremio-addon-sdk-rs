@@ -107,7 +107,7 @@ impl BuilderWithHandlers {
     pub fn define_subtitles_handler(&mut self, handler: Handler) -> &mut Self {
         self.handle_resource("subtitles", handler)
     }
-    pub fn handle(&self, path: &str) -> Option<EnvFuture<ResourceResponse>> {
+    pub fn handle(&self, path: &str) -> Option<ResourceResponse> {
         // get requested resource
         let resource = match ResourceRef::from_str(path) {
             Ok(r) => r,
@@ -123,7 +123,13 @@ impl BuilderWithHandlers {
         
         // execute the handler
         let env_future: EnvFuture<ResourceResponse> = handler.get(&resource);
-        Some(env_future)
+        
+        let resource_response = match env_future.wait() {
+            Ok(r) => r,
+            Err(_) => return None
+        };
+
+        Some(resource_response)
     }
     fn prefix_to_name(&self, prefix: &String) -> String {
         prefix.replace("/", "")

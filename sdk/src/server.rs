@@ -1,5 +1,4 @@
 use crate::router::BuilderWithHandlers;
-use futures::{Future};
 use tide::middleware::{Cors, Origin};
 use http::header::HeaderValue;
 use super::router::AddonRouter;
@@ -20,13 +19,9 @@ async fn handle_landing(req: tide::Request<BuilderWithHandlers>) -> tide::Respon
 
 async fn handle_path(req: tide::Request<BuilderWithHandlers>) -> tide::Response {
     let path = req.uri().path();
-    let resource_response_future = match req.state().handle(path) {
+    let resource_response = match req.state().handle(path) {
         Some(r) => r,
         None => return tide::Response::new(404)
-    };
-    let resource_response = match resource_response_future.wait() {
-        Ok(r) => r,
-        Err(_) => return tide::Response::new(500)
     };
     tide::Response::new(200).body_json(&resource_response).unwrap()
 }
