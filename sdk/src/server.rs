@@ -28,7 +28,7 @@ pub fn serve_http(build: BuilderWithHandlers, options: ServerOptions) {
     let service = make_service_fn(move |_: &AddrStream| {
         let router = Router::new(build.clone(), options.clone());
         service_fn_ok(move |req: Request<Body>| {
-            router.route(req)
+            router.route(req).response()
         })
     });
 

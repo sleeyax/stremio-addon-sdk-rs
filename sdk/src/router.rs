@@ -3,9 +3,55 @@ use stremio_core::types::addons::Manifest;
 use hyper::{Response, Request, Body, StatusCode, header, Method};
 use serde_json;
 use serde_json::Result;
+use now_lambda::IntoResponse;
 use super::server::ServerOptions;
 use super::builder::BuilderWithHandlers;
 use super::builder::AddonRouter;
+use futures::stream::Stream;
+use futures::future::Future;
+
+pub struct RouterResponse {
+    response: Response<Body>
+}
+// implement now.sh lambda response trait
+impl IntoResponse for RouterResponse {
+    // convert Hyper Response to Now.sh Response
+    fn into_response(self) -> Response<now_lambda::Body> {
+        let (parts, body) = self.response.into_parts();
+
+        // TODO: try to map Hyper Response Body to Now.sh Response Body
+
+        // get original response body as bytes
+        let x = body.concat2().wait().unwrap().into_bytes();
+        let mut bytes: Vec<u8> = vec![];
+        bytes.extend_from_slice(&*x);
+        /* let bytes_future = hyperBody.fold(Vec::new(), |mut acc: Vec<u8>, chunk: hyper::body::Chunk| {
+            acc.extend_from_slice(&*chunk);
+            futures::future::ok(acc)
+        });
+        let bytes = match bytes_future.wait() {
+            Ok(r) => r,
+            Err(_) => vec![]
+        }; */
+
+        Response::from_parts(parts, now_lambda::Body::from(bytes))
+    }
+}
+// read RouterResponse from Hyper Response
+impl From<Response<Body>> for RouterResponse {
+    fn from(response: Response<Body>) -> RouterResponse {
+        Self {response}
+    }
+}
+impl RouterResponse {
+    pub fn response(self) -> Response<Body> {
+        self.response
+    }
+
+    pub fn response_serverless(self) -> Response<now_lambda::Body> {
+        self.into_response()
+    }
+}
 
 pub struct Router {
     build: BuilderWithHandlers,
@@ -72,17 +118,19 @@ impl Router {
         self.handle_landing(landing_template(self.get_manifest()))
     }
 
-    pub fn route(&self, request: Request<Body>) -> Response<Body> {
+    pub fn route<T>(&self, request: Request<T>) -> RouterResponse {
         if request.method() != Method::GET {
-            return self.method_not_allowed();
+            return RouterResponse::from(self.method_not_allowed());
         }
 
         let path = request.uri().path();
         
-        match path {
-            "/manifest.json" => self.handle_manifest(),
-            "/" => self.handle_default_landing(),
-            _ => self.handle_resource(path)
-        }
+        RouterResponse::from(
+            match path {
+                "/manifest.json" => self.handle_manifest(),
+                "/" => self.handle_default_landing(),
+                _ => self.handle_resource(path)
+            }
+        )
     }
 }
