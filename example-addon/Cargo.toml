@@ -12,3 +12,9 @@ stremio-addon-sdk = { path = "../sdk/" }
 semver = "*"
 futures = "0.1"
 tokio = { version = "0.2", features = ["full"] }
+
+# for now.sh deployments, comment 'stremio-addon-sdk' above and uncomment the following:
+# stremio-addon-sdk = {git = "https://github.com/sleeyax/stremio-addon-sdk/"}
+[lib]
+name = "serverless"
+path = "src/serverless.rs"

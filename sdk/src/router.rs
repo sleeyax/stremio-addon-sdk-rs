@@ -1,172 +1,131 @@
-use stremio_core::types::addons::{ResourceRef, ManifestResource, ParseResourceErr, ResourceResponse, Manifest};
-use stremio_core::addon_transport::AddonInterface;
-use stremio_core::state_types::EnvFuture;
-use futures::{future, Future};
-use std::error::Error;
-use std::str::FromStr;
+use super::landing_template::landing_template;
+use stremio_core::types::addons::Manifest;
+use hyper::{Response, Request, Body, StatusCode, header, Method};
+use serde_json;
+use serde_json::Result;
+use now_lambda::IntoResponse;
+use super::server::ServerOptions;
+use super::builder::BuilderWithHandlers;
+use super::builder::AddonRouter;
+use futures::stream::Stream;
+use futures::future::Future;
 
-type Handler = fn (req: &ResourceRef) -> EnvFuture<ResourceResponse>;
-type RouterFut = Box<dyn Future<Item=ResourceResponse, Error=RouterErr>>;
+pub struct RouterResponse {
+    response: Response<Body>
+}
+// implement now.sh lambda response trait
+impl IntoResponse for RouterResponse {
+    // convert Hyper Response to Now.sh Response
+    fn into_response(self) -> Response<now_lambda::Body> {
+        let (parts, body) = self.response.into_parts();
 
-#[derive(Debug)]
-pub enum RouterErr {
-    NotFound,
-    Handler(Box<dyn Error>),
-    Parse(ParseResourceErr)
+        // get original response body as bytes array
+        let bytes = body
+            .concat2()
+            .wait()
+            .unwrap()
+            .into_bytes();
+        let mut bytes_array: Vec<u8> = vec![];
+        bytes_array.extend_from_slice(&*bytes);
+       
+        Response::from_parts(parts, now_lambda::Body::from(bytes_array))
+    }
 }
-pub trait AddonRouter {
-    fn get_manifest(&self) -> &Manifest;
-    fn route(&self, path: &str) -> RouterFut;
+// read RouterResponse from Hyper Response
+impl From<Response<Body>> for RouterResponse {
+    fn from(response: Response<Body>) -> RouterResponse {
+        Self {response}
+    }
 }
-impl Error for RouterErr {}
-impl std::fmt::Display for RouterErr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "RouterError")
+impl RouterResponse {
+    pub fn response(self) -> Response<Body> {
+        self.response
+    }
+
+    pub fn response_serverless(self) -> Response<now_lambda::Body> {
+        self.into_response()
     }
 }
 
-// Base: just serving the manifest
-#[derive(Clone)]
-pub struct AddonBase {
-    manifest: Manifest
+pub struct Router {
+    build: BuilderWithHandlers,
+    options: ServerOptions
 }
-impl AddonRouter for AddonBase {
+impl Router {
+    pub fn new(build: BuilderWithHandlers, options: ServerOptions) -> Self {
+        Self {build, options}
+    }
+
     fn get_manifest(&self) -> &Manifest {
-        &self.manifest
+        self.build.handlers[0].get_manifest()
     }
 
-    fn route(&self, _: &str) -> RouterFut {
-        Box::new(future::err(RouterErr::NotFound))
-    }
-}
-
-// WithHandler: attach a handler
-#[derive(Clone)]
-pub struct WithHandler<T: AddonRouter> {
-    base: T,
-    pub match_prefix: String,
-    handler: Handler,
-}
-impl<T: AddonRouter> AddonRouter for WithHandler<T> {
-    fn get_manifest(&self) -> &Manifest {
-        self.base.get_manifest()
+    fn json_response(&self, json: Result<String>) -> Response<Body> {
+        Response::builder()
+            .status(StatusCode::OK)
+            .header("access-control-allow-origin", "*") // CORS
+            .header("Cache-Control", format!("max-age={}, public", self.options.cache_max_age)) // cache
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(json.expect("Failed to read json")))
+            .unwrap() // internal server error TODO: return proper response in case this happens
     }
 
-    fn route(&self, path: &str) -> RouterFut {
-        if path.starts_with(&self.match_prefix) {
-            let res = match ResourceRef::from_str(&path) {
-                Ok(r) => r,
-                Err(e) => return Box::new(future::err(RouterErr::Parse(e)))
-            };
-            return Box::new((self.handler)(&res).map_err(|e| RouterErr::Handler(e)));
-        }
-        self.base.route(&path)
+    fn html_response(&self, html: String) -> Response<Body> {
+        Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "text/html")
+            .body(Body::from(html))
+            .unwrap()
     }
-}
 
-// Builder: constructs a new builder that implements WithHandler
-pub struct Builder {}
-impl Builder {
-    pub fn new(manifest: Manifest) -> BuilderWithHandlers {
-        // typestate, two different types for the builder, when we attach handlers
-        // so that we cannot build before that
-        BuilderWithHandlers {
-            handlers: vec![],
-            base: AddonBase { manifest }
-        }
+    fn not_found(&self) -> Response<Body> {
+        Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body("Not Found".into())
+            .unwrap()
     }
-}
 
-// BuilderWithHandlers: builder with handlers attached
-pub struct BuilderWithHandlers {
-    base: AddonBase,
-    handlers: Vec<WithHandler<AddonBase>>
-}
-impl BuilderWithHandlers {
-    fn handle_resource(&mut self, resource_name: &str, handler: Handler) -> &mut Self {
-        if self.handlers.iter().any(|h| self.prefix_to_name(&h.match_prefix) == resource_name) {
-            panic!("handler for resource {} is already defined!", resource_name);
-        }
-        self.handlers.push(WithHandler {
-            base: self.base.clone(),
-            match_prefix: format!("/{}/", resource_name),
-            handler
-        });
-        self
+    fn method_not_allowed(&self) -> Response<Body> {
+        Response::builder()
+            .status(StatusCode::METHOD_NOT_ALLOWED)
+            .body("Method not allowed".into())
+            .unwrap()
     }
-    pub fn define_stream_handler(&mut self, handler: Handler) -> &mut Self {
-        self.handle_resource("stream", handler)
-    }
-    pub fn define_meta_handler(&mut self, handler: Handler) -> &mut Self {
-        self.handle_resource("meta", handler)
-    }
-    pub fn define_catalog_handler(&mut self, handler: Handler) -> &mut Self {
-        self.handle_resource("catalog", handler)
-    }
-    pub fn define_subtitles_handler(&mut self, handler: Handler) -> &mut Self {
-        self.handle_resource("subtitles", handler)
-    }
-    fn prefix_to_name(&self, prefix: &String) -> String {
-        prefix.replace("/", "")
-    }
-    fn validate(&self) -> Vec<String> {
-        let mut errors: Vec<String> = Vec::new();
-        let manifest = self.base.get_manifest();
 
-        if self.handlers.len() == 0 {
-            errors.push("at least one handler must be defined".into());
-        }
+    pub fn handle_manifest(&self) -> Response<Body> {
+        self.json_response(serde_json::to_string(self.get_manifest()))
+    }
+
+    pub fn handle_resource(&self, path: &str) -> Response<Body> {
+        let res = match self.build.handle(path) {
+			Some(r) => r,
+			None => return self.not_found()
+        };
         
-        // get all handlers that are declared in the maifest
-        let mut handlers_in_manifest: Vec<String> = Vec::new();
-        if manifest.catalogs.len() > 0 {
-            handlers_in_manifest.push("catalog".into());
-        }
-        for resource in &manifest.resources {
-            // NOTE: resource.name() should probably be public in stremio-core, making this code unnecessary
-            match resource {
-                ManifestResource::Short(n) => handlers_in_manifest.push(n.to_string()),
-                ManifestResource::Full { name, .. } => handlers_in_manifest.push(name.to_string()),
-            }
-        }
-        
-        // check if defined handlers are also specified in the manifest
-        for defined_handler in &self.handlers {
-            if !handlers_in_manifest.iter().any(|r| r.to_string() == self.prefix_to_name(&defined_handler.match_prefix)) {
-                if defined_handler.match_prefix == "/catalog/" {
-                    errors.push("manifest.catalogs is empty, catalog handler will never be called".into());
-                }
-                else {
-                    errors.push(format!("manifest.resources does not contain: {}", self.prefix_to_name(&defined_handler.match_prefix)));
-                }
-            }
-        }
-
-        // check if handlers that are specified in the manifest are also defined
-        for handler in handlers_in_manifest {
-            if !self.handlers.iter().any(|r| handler == self.prefix_to_name(&r.match_prefix)) {
-                errors.push(format!("manifest definition requires handler for {}, but it is not provided", handler));
-            }
-        }
-
-        return errors;
-        
+        self.json_response(serde_json::to_string(&res))
     }
-    pub fn build(&self) -> Vec<WithHandler<AddonBase>> {
-        let errors = self.validate();
-        if errors.len() > 0 {
-            panic!(format!("\n--failed to build addon interface-- \n{}", errors.join("\n")));
+
+    pub fn handle_landing(&self, template: String) -> Response<Body> {
+        self.html_response(template)
+    }
+
+    pub fn handle_default_landing(&self) -> Response<Body> {
+        self.handle_landing(landing_template(self.get_manifest()))
+    }
+
+    pub fn route<T>(&self, request: Request<T>) -> RouterResponse {
+        if request.method() != Method::GET {
+            return RouterResponse::from(self.method_not_allowed());
         }
-        self.handlers.clone()
+
+        let path = request.uri().path();
+        
+        RouterResponse::from(
+            match path {
+                "/manifest.json" => self.handle_manifest(),
+                "/" => self.handle_default_landing(),
+                _ => self.handle_resource(path)
+            }
+        )
     }
 }
-
-impl<T: AddonRouter> AddonInterface for WithHandler<T> {
-    fn manifest(&self) -> EnvFuture<Manifest> {
-        Box::new(future::ok(self.get_manifest().to_owned()))
-    }
-    fn get(&self, req: &ResourceRef) -> EnvFuture<ResourceResponse> {
-        Box::new(self.route(&req.to_string()).map_err(Into::into))
-    }
-}
-

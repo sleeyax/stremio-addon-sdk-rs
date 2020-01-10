@@ -1,100 +1,47 @@
-use tide::server::Server;
-use tide::server::Service;
-use stremio_core::state_types::EnvFuture;
-use stremio_core::types::addons::{ResourceRef, ResourceResponse};
-use futures::{Future};
-use std::str::FromStr;
-use stremio_core::addon_transport::AddonInterface;
-use tide::middleware::{Cors, Origin};
-use http::header::HeaderValue;
-use super::router::{WithHandler, AddonBase};
-use super::router::AddonRouter;
-use super::landing_template::landing_template;
-use super::cache_middleware::Cache;
+use hyper::Request;
+use hyper::server::conn::AddrStream;
+use hyper::service::{make_service_fn, service_fn_ok};
+use hyper::{Body};
+use hyper::server::Server;
+use hyper::rt::Future;
+use super::router::Router;
+use super::builder::BuilderWithHandlers;
 
-type Handlers = Vec<WithHandler<AddonBase>>;
-
-async fn handle_manifest(req: tide::Request<Handlers>) -> tide::Response {
-    tide::Response::new(200).body_json(req.state()[0].get_manifest()).unwrap()
-}
-
-async fn handle_landing(req: tide::Request<Handlers>) -> tide::Response {
-    tide::Response::new(200)
-        .body_string(
-            landing_template(req.state()[0].get_manifest())
-        )
-        .set_header("Content-Type", "text/html")
-}
-
-async fn handle_path(req: tide::Request<Handlers>) -> tide::Response {
-    // get requested resource
-    let path = req.uri().path();
-    let resource = match ResourceRef::from_str(&path) {
-        Ok(r) => r,
-        Err(_) => return tide::Response::new(404)
-    };
-    dbg!(&resource);
-
-    // find correct handler for this resource
-    let handlers: &Vec<WithHandler<AddonBase>> = &req.state();
-    let handler_option = handlers.iter().find(|&item| path.starts_with(&item.match_prefix));
-    let handler = match handler_option {
-        Some(x) => x,
-        _ => return tide::Response::new(404)
-    };
-    
-    // execute the handler
-    let env_future: EnvFuture<ResourceResponse> = handler.get(&resource);
-    let resource_response = match env_future.wait() {
-        Ok(r) => r,
-        Err(_) => return tide::Response::new(500)
-    };
-    dbg!(&resource_response);
-
-    // let msg = ResourceResponse::Streams { streams: vec![] };
-    tide::Response::new(200).body_json(&resource_response).unwrap()
-}
-
+#[derive(Clone)]
 pub struct ServerOptions {
     pub port: i16,
-    pub cache_max_age: Option<i32>
+    pub cache_max_age: i32
 }
 impl Default for ServerOptions {
     fn default() -> Self {
         Self {
             // cache 3 days
-            cache_max_age: Some(24 * 3600 * 3),
+            cache_max_age: 24 * 3600 * 3,
             port: 7070
         }
     }
 }
 
-pub async fn serve_http(handlers: Handlers, options: ServerOptions) {
-    let port = options.port.clone();
-    let app = get_app(handlers, options);
-    app.listen(format!("127.0.0.1:{}", port)).await.expect("Failed to start server");
+pub fn serve_http(build: BuilderWithHandlers, options: ServerOptions) {
+    let addr = format!("127.0.0.1:{}", options.port).parse().unwrap();
+    
+    let service = make_service_fn(move |_: &AddrStream| {
+        let router = Router::new(build.clone(), options.clone());
+        service_fn_ok(move |req: Request<Body>| {
+            router.route(req).response()
+        })
+    });
+
+    let server = Server::bind(&addr)
+        .serve(service)
+        .map_err(|e| eprintln!("server error: {}", e));
+
+    println!("Running on http://{}", addr);
+
+    hyper::rt::run(server)
 }
 
-fn get_app(handlers: Handlers, options: ServerOptions) -> Server<Handlers> {
-    let mut app = tide::with_state(handlers);
-    app.middleware(
-        Cors::new()
-            .allow_methods(HeaderValue::from_static("GET, POST, OPTIONS"))
-            .allow_origin(Origin::from("*"))
-            .allow_credentials(false)
-    );
-    if let Some(cache) = options.cache_max_age {
-        app.middleware(
-            Cache::new(cache)
-        );
-    }
-    app.at("/manifest.json").get(handle_manifest);
-    app.at("/").get(handle_landing);
-    app.at("/*").get(handle_path);
-    app
-}
-
-pub fn get_router(handlers: Handlers, options: ServerOptions) -> Service<Handlers> {
-    let app = get_app(handlers, options);
-    app.into_http_service()
+pub fn serve_serverless(req: now_lambda::Request, build: BuilderWithHandlers, options: ServerOptions) -> Result<impl now_lambda::IntoResponse, now_lambda::error::NowError> {
+    let router = Router::new(build, options);
+    Ok(router.route(req))
 }
