@@ -40,3 +40,8 @@ pub fn serve_http(build: BuilderWithHandlers, options: ServerOptions) {
 
     hyper::rt::run(server)
 }
+
+pub fn serve_serverless(req: now_lambda::Request, build: BuilderWithHandlers, options: ServerOptions) -> Result<impl now_lambda::IntoResponse, now_lambda::error::NowError> {
+    let router = Router::new(build, options);
+    Ok(router.route(req))
+}
