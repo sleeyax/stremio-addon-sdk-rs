@@ -14,10 +14,10 @@ async fn main() {
 
     // HTTP server settings
     let options = ServerOptions {
-        cache_max_age: Some(9999),
+        cache_max_age: 9999,
         port: 1337
     };
 
     // run HTTP server asynchronously
-    serve_http(interface, options).await;
+    serve_http(interface, options);
 }

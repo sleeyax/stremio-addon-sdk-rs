@@ -1,8 +1,8 @@
-use stremio_addon_sdk::router::BuilderWithHandlers;
+use stremio_addon_sdk::builder::BuilderWithHandlers;
 use stremio_core::state_types::EnvFuture;
 use stremio_core::types::addons::*;
 use stremio_core::types::*;
-use stremio_addon_sdk::router::Builder;
+use stremio_addon_sdk::builder::Builder;
 use futures::future;
 
 fn handle_stream(resource: &ResourceRef) -> EnvFuture<ResourceResponse> {
