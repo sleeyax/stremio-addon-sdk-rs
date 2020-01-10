@@ -19,22 +19,16 @@ impl IntoResponse for RouterResponse {
     fn into_response(self) -> Response<now_lambda::Body> {
         let (parts, body) = self.response.into_parts();
 
-        // TODO: try to map Hyper Response Body to Now.sh Response Body
-
-        // get original response body as bytes
-        let x = body.concat2().wait().unwrap().into_bytes();
-        let mut bytes: Vec<u8> = vec![];
-        bytes.extend_from_slice(&*x);
-        /* let bytes_future = hyperBody.fold(Vec::new(), |mut acc: Vec<u8>, chunk: hyper::body::Chunk| {
-            acc.extend_from_slice(&*chunk);
-            futures::future::ok(acc)
-        });
-        let bytes = match bytes_future.wait() {
-            Ok(r) => r,
-            Err(_) => vec![]
-        }; */
-
-        Response::from_parts(parts, now_lambda::Body::from(bytes))
+        // get original response body as bytes array
+        let bytes = body
+            .concat2()
+            .wait()
+            .unwrap()
+            .into_bytes();
+        let mut bytes_array: Vec<u8> = vec![];
+        bytes_array.extend_from_slice(&*bytes);
+       
+        Response::from_parts(parts, now_lambda::Body::from(bytes_array))
     }
 }
 // read RouterResponse from Hyper Response
@@ -70,6 +64,7 @@ impl Router {
         Response::builder()
             .status(StatusCode::OK)
             .header("access-control-allow-origin", "*") // CORS
+            .header("Cache-Control", format!("max-age={}, public", self.options.cache_max_age)) // cache
             .header(header::CONTENT_TYPE, "application/json")
             .body(Body::from(json.expect("Failed to read json")))
             .unwrap() // internal server error TODO: return proper response in case this happens

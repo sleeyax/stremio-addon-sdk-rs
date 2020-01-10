@@ -10,13 +10,13 @@ use super::builder::BuilderWithHandlers;
 #[derive(Clone)]
 pub struct ServerOptions {
     pub port: i16,
-    pub cache_max_age: Option<i32>
+    pub cache_max_age: i32
 }
 impl Default for ServerOptions {
     fn default() -> Self {
         Self {
             // cache 3 days
-            cache_max_age: Some(24 * 3600 * 3),
+            cache_max_age: 24 * 3600 * 3,
             port: 7070
         }
     }
