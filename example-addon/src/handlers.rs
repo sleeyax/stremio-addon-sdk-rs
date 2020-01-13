@@ -34,15 +34,9 @@ fn handle_catalog(_resource: &ResourceRef) -> EnvFuture<ResourceResponse> {
             id: "tt1254207".into(),
             name: "Big buck Bunny".into(),
             poster: Some("https://image.tmdb.org/t/p/w600_and_h900_bestv2/uVEFQvFMMsg4e6yb03xOfVsDz4o.jpg".into()),
-            poster_shape: PosterShape::default(),
             description: Some("addon test".into()),
-            genres: vec![],
-            logo: None,
-            release_info: None,
-            released: None,
-            runtime: None,
-            trailer: None,
-            type_name: "others".into()
+            type_name: "others".into(),
+            ..Default::default()
         }
     ]}))
 }

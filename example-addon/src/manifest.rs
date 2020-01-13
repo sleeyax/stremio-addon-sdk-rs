@@ -1,5 +1,6 @@
 use semver::Version;
 use stremio_core::types::addons::*;
+use stremio_addon_sdk::scaffold::Scaffold;
 
 pub fn get_manifest() -> Manifest {
     Manifest {
@@ -19,12 +20,8 @@ pub fn get_manifest() -> Manifest {
                 extra: ManifestExtra::default()
             }
         ],
-        contact_email: None,
-        background: None,
-        logo: None,
         id_prefixes: Some(vec!["tt".into()]),
         description: Some("Rust addon test".into()),
-        addon_catalogs: vec![],
-        behavior_hints:  Default::default() // serde_json::map::Map::new()
+        ..Scaffold::default_manifest()
     }
 }
