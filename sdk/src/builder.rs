@@ -4,8 +4,9 @@ use stremio_core::state_types::EnvFuture;
 use futures::{future, Future};
 use std::error::Error;
 use std::str::FromStr;
+use std::sync::Arc;
 
-type Handler = fn (req: &ResourceRef) -> EnvFuture<ResourceResponse>;
+type Handler = dyn Fn(&ResourceRef) -> EnvFuture<ResourceResponse> + Send + Sync + 'static;
 type RouterFut = Box<dyn Future<Item=ResourceResponse, Error=RouterErr>>;
 
 #[derive(Debug)]
@@ -45,7 +46,7 @@ impl AddonRouter for AddonBase {
 pub struct WithHandler<T: AddonRouter> {
     base: T,
     pub match_prefix: String,
-    handler: Handler,
+    handler: Arc<Handler>
 }
 impl<T: AddonRouter> AddonRouter for WithHandler<T> {
     fn get_manifest(&self) -> &Manifest {
@@ -84,27 +85,36 @@ pub struct BuilderWithHandlers {
     pub handlers: Vec<WithHandler<AddonBase>>
 }
 impl BuilderWithHandlers {
-    fn handle_resource(&mut self, resource_name: &str, handler: Handler) -> &mut Self {
+    fn handle_resource<F>(&mut self, resource_name: &str, handler: F) -> &mut Self 
+    where F: Fn(&ResourceRef) -> EnvFuture<ResourceResponse> + Send + Sync + 'static 
+    {
         if self.handlers.iter().any(|h| self.prefix_to_name(&h.match_prefix) == resource_name) {
             panic!("handler for resource {} is already defined!", resource_name);
         }
         self.handlers.push(WithHandler {
             base: self.base.clone(),
             match_prefix: format!("/{}/", resource_name),
-            handler
+            handler: Arc::new(handler)
         });
         self
     }
-    pub fn define_stream_handler(&mut self, handler: Handler) -> &mut Self {
+    pub fn define_stream_handler<F>(&mut self, handler: F) -> &mut Self 
+    where F: Fn(&ResourceRef) -> EnvFuture<ResourceResponse> + Send + Sync + 'static 
+    {
         self.handle_resource("stream", handler)
     }
-    pub fn define_meta_handler(&mut self, handler: Handler) -> &mut Self {
+    pub fn define_meta_handler<F>(&mut self, handler: F) -> &mut Self 
+    where F: Fn(&ResourceRef) -> EnvFuture<ResourceResponse> + Send + Sync + 'static 
+    {
         self.handle_resource("meta", handler)
     }
-    pub fn define_catalog_handler(&mut self, handler: Handler) -> &mut Self {
+    pub fn define_catalog_handler<F>(&mut self, handler: F) -> &mut Self
+    where F: Fn(&ResourceRef) -> EnvFuture<ResourceResponse> + Send + Sync + 'static {
         self.handle_resource("catalog", handler)
     }
-    pub fn define_subtitles_handler(&mut self, handler: Handler) -> &mut Self {
+    pub fn define_subtitles_handler<F>(&mut self, handler: F) -> &mut Self 
+    where F: Fn(&ResourceRef) -> EnvFuture<ResourceResponse> + Send + Sync + 'static 
+    {
         self.handle_resource("subtitles", handler)
     }
     pub fn handle(&self, path: &str) -> Option<ResourceResponse> {
