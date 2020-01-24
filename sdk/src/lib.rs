@@ -2,6 +2,7 @@ pub mod builder;
 pub mod server;
 pub mod landing_template;
 pub mod router;
+pub mod helpers;
 pub mod export {
     pub mod serverless {
         pub mod now {
