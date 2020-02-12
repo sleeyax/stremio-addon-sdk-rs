@@ -43,6 +43,8 @@ See the [example-addon](example-addon) for more details or take a look at the [d
     * [now.sh](https://zeit.co/home) deployments are [supported](https://github.com/sleeyax/stremio-addon-sdk/wiki/Now).
 * Why would I use this over the official SDK?
     * You tell me. Types, speed & stremio-core are my reasons ;)
+* How do I publish my addon?
+    * Use [this website](https://stremio.github.io/stremio-publish-addon/) to publish your addon to the public Stremio addon collection.
 
 ## Documentation
 Documentation can be found [here](https://github.com/sleeyax/stremio-addon-sdk/wiki).
