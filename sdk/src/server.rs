@@ -10,7 +10,7 @@ use super::builder::BuilderWithHandlers;
 
 #[derive(Clone)]
 pub struct ServerOptions {
-    pub port: i16,
+    pub port: u16,
     pub cache_max_age: i32
 }
 impl Default for ServerOptions {
