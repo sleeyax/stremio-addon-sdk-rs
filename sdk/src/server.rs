@@ -9,7 +9,7 @@ use hyper::rt::Future;
 use super::router::Router;
 use super::builder::BuilderWithHandlers;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ServerOptions {
     pub port: u16,
     pub cache_max_age: i32,
