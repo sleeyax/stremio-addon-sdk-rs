@@ -1,9 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use futures::MapErr;
-use hyper::Request;
+use hyper::{Request, Response, StatusCode, Body};
 use hyper::server::conn::AddrStream;
 use hyper::service::{make_service_fn, service_fn_ok};
-use hyper::{Body};
 use hyper::server::Server;
 use hyper::rt::Future;
 use super::router::Router;
@@ -32,7 +30,15 @@ pub fn serve_http(build: BuilderWithHandlers, options: ServerOptions) {
     let service = make_service_fn(move |_: &AddrStream| {
         let router = Router::new(build.clone(), options.clone());
         service_fn_ok(move |req: Request<Body>| {
-            router.route(req).response()
+            match router.route(req) {
+                Ok(router_response) => router_response.response(),
+                Err(error) => {
+                    eprintln!("service error: {:?}", error);
+                    let mut response = Response::new(Body::empty());
+                    *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+                    response
+                }
+            }
         })
     });
 
@@ -49,5 +55,12 @@ pub fn serve_serverless(
     req: now_lambda::Request, build: BuilderWithHandlers, options: ServerOptions
 ) -> Result<impl now_lambda::IntoResponse, now_lambda::error::NowError> {
     let router = Router::new(build, options);
-    Ok(router.route(req))
+    match router.route(req) {
+        Ok(router_response) => Ok(router_response),
+        Err(error) => {
+            let error_message = format!("service error: {:?}", error);
+            eprintln!("{}", error_message);
+            Err(now_lambda::error::NowError::new(&error_message))
+        }
+    }
 }
