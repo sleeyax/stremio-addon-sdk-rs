@@ -41,7 +41,7 @@ pub fn landing_template(manifest: &Manifest) -> String {
         .into_iter()
         .map(|mut type_| {
             make_ascii_sentence_case(&mut type_);
-            format!("<li>{}{}</li>", type_, if type_ != "series" { "s" } else {""})
+            format!("<li>{}{}</li>", type_, if type_ != "Series" { "s" } else {""})
         })
         .collect::<Vec<_>>()
         .join("");
