@@ -41,6 +41,7 @@ See the [example-addon](example-addon) for more details or take a look at the [d
 ## FAQ
 * How do I host my addon?
     * [now.sh](https://zeit.co/home) deployments are [supported](https://github.com/sleeyax/stremio-addon-sdk/wiki/Now).
+    * [heroku](https://dashboard.heroku.com) deployments are [supported](https://github.com/sleeyax/stremio-addon-sdk/wiki/Heroku).
 * Why would I use this over the official SDK?
     * You tell me. Types, speed & stremio-core are my reasons ;)
 * How do I publish my addon?
