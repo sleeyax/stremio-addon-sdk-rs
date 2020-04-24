@@ -24,7 +24,7 @@ async fn main() {
 
     // HTTP server settings
     let options = ServerOptions {
-        cache_max_age: 9999,
+        cache_max_age: 3600 * 24 *3, // cache for 3 days
         port,
         ip: Ipv4Addr::new(0,0,0,0).into(),
     };
