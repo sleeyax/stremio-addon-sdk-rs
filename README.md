@@ -49,3 +49,6 @@ See the [example-addon](example-addon) for more details or take a look at the [d
 
 ## Documentation
 Documentation can be found [here](https://github.com/sleeyax/stremio-addon-sdk/wiki).
+
+## Related projects
+#### If you're a gopher, check out the [Stremio addon SDK for Go](https://github.com/Deflix-tv/go-stremio).
